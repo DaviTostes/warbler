@@ -123,8 +123,6 @@ func WebSearchTool(g *genkit.Genkit) *ai.ToolDef[WebSearchInput, string] {
 	return genkit.DefineTool(g, "web_search",
 		"Search the web for current or time-sensitive information. Pass {\"query\": \"...\"}.",
 		func(ctx *ai.ToolContext, input WebSearchInput) (string, error) {
-			fmt.Println("Searching in the web...")
-
 			q := input.Query
 			if q == "" && input.Parameters != nil {
 				q = input.Parameters.Query

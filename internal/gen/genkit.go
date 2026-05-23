@@ -34,6 +34,20 @@ func InitGenkit() (*genkit.Genkit, error) {
 }
 
 func Generate(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef,
+	outputFormat any, messages []*ai.Message) (string, error) {
+	resp, err := genkit.Generate(
+		context.Background(), g,
+		ai.WithModelName("openai/gpt-5-nano"),
+		ai.WithSystem(system),
+		ai.WithPrompt(prompt),
+		ai.WithTools(tools...),
+		ai.WithMessages(messages...),
+	)
+
+	return resp.Text(), err
+}
+
+func GenerateStream(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef,
 	outputFormat any, messages []*ai.Message) iter.Seq2[*ai.ModelStreamValue, error] {
 	resp := genkit.GenerateStream(
 		context.Background(), g,
