@@ -63,13 +63,14 @@ func generate(m model, prompt string) tea.Cmd {
 }
 
 type model struct {
-	viewport   viewport.Model
-	textarea   textarea.Model
-	spinner    spinner.Model
-	g          *genkit.Genkit
-	messages   []*ai.Message
-	generating bool
-	err        error
+	viewport    viewport.Model
+	textarea    textarea.Model
+	spinner     spinner.Model
+	g           *genkit.Genkit
+	messages    []*ai.Message
+	generating  bool
+	doubleCtrlC bool
+	err         error
 }
 
 func (m model) renderMessages() string {
@@ -103,8 +104,7 @@ func initialModel(g *genkit.Genkit) model {
 	ta.ShowLineNumbers = false
 
 	vp := viewport.New(viewport.WithWidth(30), viewport.WithHeight(5))
-	vp.SetContent(`Welcome to boteco!
-Type a message and press Enter to send.`)
+	vp.SetContent(``)
 	vp.KeyMap.Left.SetEnabled(false)
 	vp.KeyMap.Right.SetEnabled(false)
 
@@ -142,15 +142,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.MouseWheelMsg:
-		var cmd tea.Cmd
-		m.viewport, cmd = m.viewport.Update(msg)
-		return m, cmd
-
 	case tea.KeyPressMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
+		case "esc":
 			return m, tea.Quit
+
+		case "ctrl+c":
+			if m.doubleCtrlC {
+				return m, tea.Quit
+			}
+
+			content := m.renderMessages() + "\nctrl+c again to quit.\n"
+			m.viewport.SetContent(content)
+			m.viewport.GotoBottom()
+
+			m.doubleCtrlC = true
 
 		case "pgup", "pgdown", "ctrl+u", "ctrl+d":
 			var cmd tea.Cmd
@@ -192,7 +198,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
 
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
@@ -226,7 +231,6 @@ func (m model) View() tea.View {
 	viewportView := m.viewport.View()
 	v := tea.NewView(viewportView + "\n" + m.textarea.View())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 
 	c := m.textarea.Cursor()
 	if c != nil {
