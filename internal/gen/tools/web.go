@@ -43,7 +43,7 @@ func WebSearch(ctx context.Context, query string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return "", fmt.Errorf("ddg status: %d", resp.StatusCode)
 	}
 

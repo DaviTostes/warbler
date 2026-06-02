@@ -4,6 +4,8 @@ import (
 	"boteco/internal/db"
 	"boteco/internal/gen"
 	"fmt"
+	"image/color"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -18,20 +20,19 @@ import (
 )
 
 func WriteMsg(msgs *strings.Builder, m *ai.Message) {
+	var c color.Color
 	switch m.Role {
 	case "user":
-		msgs.WriteString("\033[32m")
+		c = lipgloss.Color("2")
 	case "model":
-		msgs.WriteString("\033[35m")
+		c = lipgloss.Color("5")
 	case "assistant":
-		msgs.WriteString("\033[31m")
+		c = lipgloss.Color("3")
 	}
-	msgs.WriteString("| ")
-	msgs.WriteString(string(m.Role))
-	msgs.WriteString("\033[0m")
+	roleStyle := lipgloss.NewStyle().Foreground(c)
+	msgs.WriteString(roleStyle.Render("| " + string(m.Role)))
 
 	msgs.WriteString("\n")
-	msgs.WriteString(" ")
 	msgs.WriteString(m.Text())
 	msgs.WriteString("\n\n")
 }
@@ -50,14 +51,13 @@ func generate(m model, prompt string) tea.Cmd {
 }
 
 type model struct {
-	viewport    viewport.Model
-	textarea    textarea.Model
-	spinner     spinner.Model
-	senderStyle lipgloss.Style
-	g           *genkit.Genkit
-	messages    []*ai.Message
-	generating  bool
-	err         error
+	viewport   viewport.Model
+	textarea   textarea.Model
+	spinner    spinner.Model
+	g          *genkit.Genkit
+	messages   []*ai.Message
+	generating bool
+	err        error
 }
 
 func (m model) renderMessages() string {
@@ -65,7 +65,11 @@ func (m model) renderMessages() string {
 	for _, msg := range m.messages {
 		WriteMsg(&b, msg)
 	}
-	return lipgloss.NewStyle().Width(m.viewport.Width()).Render(b.String())
+	return lipgloss.NewStyle().
+		Width(m.viewport.Width()).
+		Height(m.viewport.Height()).
+		AlignVertical(lipgloss.Bottom).
+		Render(b.String())
 }
 
 func initialModel(g *genkit.Genkit) model {
@@ -78,7 +82,7 @@ func initialModel(g *genkit.Genkit) model {
 	ta.CharLimit = 200
 
 	ta.SetWidth(30)
-	ta.SetHeight(3)
+	ta.SetHeight(2)
 
 	s := ta.Styles()
 	s.Focused.CursorLine = lipgloss.NewStyle()
@@ -99,14 +103,13 @@ Type a message and press Enter to send.`)
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
-		textarea:    ta,
-		viewport:    vp,
-		spinner:     sp,
-		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
-		g:           g,
-		messages:    []*ai.Message{},
-		generating:  false,
-		err:         nil,
+		textarea:   ta,
+		viewport:   vp,
+		spinner:    sp,
+		g:          g,
+		messages:   []*ai.Message{},
+		generating: false,
+		err:        nil,
 	}
 }
 
@@ -190,10 +193,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		m.viewport.SetContent(m.renderMessages() + "\n " + m.spinner.View() + "Thinking...")
-
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
+
+		content := m.renderMessages() + "\n" + m.spinner.View() + "Thinking..."
+		m.viewport.SetContent(content)
+		m.viewport.GotoBottom()
+
 		return m, cmd
 	}
 
@@ -213,6 +219,10 @@ func (m model) View() tea.View {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelWarn,
+	})))
+
 	err := db.Connect()
 	if err != nil {
 		panic(err)
