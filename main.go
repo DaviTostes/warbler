@@ -15,26 +15,29 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/glamour"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 )
 
 func WriteMsg(msgs *strings.Builder, m *ai.Message) {
 	var c color.Color
+	t := "\n  " + m.Text() + "\n\n"
+
 	switch m.Role {
 	case "user":
 		c = lipgloss.Color("2")
 	case "model":
 		c = lipgloss.Color("5")
+		t, _ = glamour.Render(m.Text(), "dark")
 	case "assistant":
 		c = lipgloss.Color("3")
 	}
+
 	roleStyle := lipgloss.NewStyle().Foreground(c)
 	msgs.WriteString(roleStyle.Render("| " + string(m.Role)))
-
 	msgs.WriteString("\n")
-	msgs.WriteString(m.Text())
-	msgs.WriteString("\n\n")
+	msgs.WriteString(t)
 }
 
 type errMsg struct{ err error }
@@ -45,8 +48,17 @@ type generatedMsg struct {
 
 func generate(m model, prompt string) tea.Cmd {
 	return func() tea.Msg {
-		resp, err := gen.Generate(m.g, gen.SystemPrompt, prompt, gen.Tools, nil, m.messages)
-		return generatedMsg{resp: resp, err: err}
+		stream := gen.GenerateStream(m.g, gen.SystemPrompt, prompt, gen.Tools, nil, m.messages)
+		for result, err := range stream {
+			if err != nil {
+				return generatedMsg{resp: "", err: err}
+			}
+
+			if result.Done {
+				return generatedMsg{resp: result.Response.Text(), err: nil}
+			}
+		}
+		return generatedMsg{resp: "", err: nil}
 	}
 }
 
@@ -79,10 +91,10 @@ func initialModel(g *genkit.Genkit) model {
 	ta.Focus()
 
 	ta.Prompt = "| "
-	ta.CharLimit = 200
+	ta.CharLimit = 10000
 
 	ta.SetWidth(30)
-	ta.SetHeight(2)
+	ta.SetHeight(3)
 
 	s := ta.Styles()
 	s.Focused.CursorLine = lipgloss.NewStyle()
@@ -99,7 +111,7 @@ Type a message and press Enter to send.`)
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
 	sp := spinner.New()
-	sp.Spinner = spinner.Dot
+	sp.Spinner = spinner.Moon
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
@@ -125,15 +137,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetHeight(msg.Height - m.textarea.Height())
 
 		if len(m.messages) > 0 {
-			m.renderMessages()
+			m.viewport.SetContent(m.renderMessages())
+			m.viewport.GotoBottom()
 		}
-		m.viewport.GotoBottom()
+		return m, nil
+
+	case tea.MouseWheelMsg:
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
+		return m, cmd
 
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
-			fmt.Println(m.textarea.Value())
 			return m, tea.Quit
+
+		case "pgup", "pgdown", "ctrl+u", "ctrl+d":
+			var cmd tea.Cmd
+			m.viewport, cmd = m.viewport.Update(msg)
+			return m, cmd
 
 		case "enter":
 			prompt := m.textarea.Value()
@@ -152,12 +174,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.generating = true
 
 			return m, tea.Batch(generate(m, prompt), m.spinner.Tick)
-
-		default:
-			var textareaCmd tea.Cmd
-			m.textarea, textareaCmd = m.textarea.Update(msg)
-
-			return m, textareaCmd
 		}
 
 	case generatedMsg:
@@ -180,7 +196,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
-
 		return m, cmd
 
 	case cursor.BlinkMsg:
@@ -196,19 +211,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 
-		content := m.renderMessages() + "\n" + m.spinner.View() + "Thinking..."
+		content := m.renderMessages() + "\n " + m.spinner.View() + "\n"
 		m.viewport.SetContent(content)
 		m.viewport.GotoBottom()
-
 		return m, cmd
 	}
 
-	return m, nil
+	var textareaCmd tea.Cmd
+	m.textarea, textareaCmd = m.textarea.Update(msg)
+	return m, textareaCmd
 }
 
 func (m model) View() tea.View {
 	viewportView := m.viewport.View()
 	v := tea.NewView(viewportView + "\n" + m.textarea.View())
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+
 	c := m.textarea.Cursor()
 	if c != nil {
 		c.Y += lipgloss.Height(viewportView)

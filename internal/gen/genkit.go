@@ -30,7 +30,7 @@ func Generate(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef,
 	outputFormat any, messages []*ai.Message) (string, error) {
 	resp, err := genkit.Generate(
 		context.Background(), g,
-		ai.WithModelName("googleai/gemini-3.5-flash"),
+		ai.WithModelName("googleai/gemini-3.1-pro-preview"),
 		ai.WithSystem(system),
 		ai.WithPrompt(prompt),
 		ai.WithTools(tools...),
@@ -45,7 +45,7 @@ func GenerateStream(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef,
 	outputFormat any, messages []*ai.Message) iter.Seq2[*ai.ModelStreamValue, error] {
 	resp := genkit.GenerateStream(
 		context.Background(), g,
-		ai.WithModelName("openai/gpt-5-nano"),
+		ai.WithModelName("googleai/gemini-3.1-pro-preview"),
 		ai.WithSystem(system),
 		ai.WithPrompt(prompt),
 		ai.WithTools(tools...),
