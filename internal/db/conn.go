@@ -2,8 +2,6 @@ package db
 
 import (
 	"database/sql"
-	"fmt"
-	"os"
 
 	_ "modernc.org/sqlite"
 )
@@ -11,10 +9,8 @@ import (
 var DB *sql.DB
 
 func Connect() error {
-	path, exists := os.LookupEnv("DB_PATH")
-	if !exists {
-		return fmt.Errorf("DB_PATH not set")
-	}
+
+	path := "/home/toast/.local/share/boteco/database.sqlite"
 
 	var err error
 	DB, err = sql.Open("sqlite", path)

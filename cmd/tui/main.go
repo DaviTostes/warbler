@@ -1,6 +1,7 @@
 package main
 
 import (
+	"boteco/internal/config"
 	"boteco/internal/db"
 	"boteco/internal/gen"
 	"fmt"
@@ -20,6 +21,44 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 )
 
+type errMsg struct{ err error }
+type generatedMsg struct {
+	resp string
+	done bool
+	err  error
+}
+
+func waitChunk(m model) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-m.streamCh
+		if !ok {
+			return nil
+		}
+
+		return msg
+	}
+}
+
+func startGeneration(m model, prompt string) tea.Cmd {
+	go func() {
+		stream := gen.GenerateStream(m.g, gen.SystemPrompt, prompt, gen.Tools, nil, m.messages)
+		for result, err := range stream {
+			if err != nil {
+				m.streamCh <- generatedMsg{resp: "", err: err}
+			}
+
+			if result.Done {
+				m.streamCh <- generatedMsg{resp: result.Response.Text(), done: true, err: nil}
+				return
+			}
+
+			m.streamCh <- generatedMsg{resp: result.Chunk.Text(), err: nil}
+		}
+	}()
+
+	return waitChunk(m)
+}
+
 func WriteMsg(msgs *strings.Builder, m *ai.Message) {
 	var c color.Color
 	t := "\n  " + m.Text() + "\n\n"
@@ -38,39 +77,6 @@ func WriteMsg(msgs *strings.Builder, m *ai.Message) {
 	msgs.WriteString(roleStyle.Render("| " + string(m.Role)))
 	msgs.WriteString("\n")
 	msgs.WriteString(t)
-}
-
-type errMsg struct{ err error }
-type generatedMsg struct {
-	resp string
-	done bool
-	err  error
-}
-
-func waitChunk(m model) tea.Cmd {
-	return func() tea.Msg {
-		return <-m.streamCh
-	}
-}
-
-func startGeneration(m model, prompt string) tea.Cmd {
-	go func() {
-		stream := gen.GenerateStream(m.g, gen.SystemPrompt, prompt, gen.Tools, nil, m.messages)
-		for result, err := range stream {
-			if err != nil {
-				m.streamCh <- generatedMsg{resp: "", err: err}
-			}
-
-			if result.Done {
-				m.streamCh <- generatedMsg{resp: result.Response.Text(), done: true, err: nil}
-				break
-			}
-
-			m.streamCh <- generatedMsg{resp: result.Chunk.Text(), err: nil}
-		}
-	}()
-
-	return waitChunk(m)
 }
 
 type model struct {
@@ -105,10 +111,11 @@ func (m model) renderLive() string {
 		WriteMsg(&b, msg)
 	}
 
-	t := "\n  " + m.currentMessage + "\n\n"
-	t, _ = glamour.Render(t, "dark")
+	t, _ := glamour.Render(m.currentMessage, "dark")
+	t = strings.TrimRight(t, "\r\n")
 
 	roleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
+
 	b.WriteString(roleStyle.Render("| model"))
 	b.WriteString("\n")
 	b.WriteString(t)
@@ -120,7 +127,22 @@ func (m model) renderLive() string {
 		Render(b.String())
 }
 
-func initialModel(g *genkit.Genkit) model {
+func initialModel() model {
+	err := db.Connect()
+	if err != nil {
+		panic(err)
+	}
+
+	c, err := config.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	g, err := gen.InitGenkit(c.Gemini.ApiKey)
+	if err != nil {
+		panic(err)
+	}
+
 	ta := textarea.New()
 	ta.Placeholder = "Write a message..."
 	ta.SetVirtualCursor(false)
@@ -215,8 +237,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				},
 			})
 
-			m.viewport.SetContent(m.renderMessages())
 			m.textarea.Reset()
+
+			m.viewport.SetContent(m.renderMessages())
 			m.viewport.GotoBottom()
 
 			m.generating = true
@@ -230,6 +253,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if msg.err != nil {
 			m.generating = false
+			m.currentMessage = ""
 			m.messages = append(m.messages, &ai.Message{
 				Role:    "assistant",
 				Content: []*ai.Part{{Text: "error: " + msg.err.Error()}},
@@ -242,6 +266,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if msg.done {
 			m.generating = false
+			m.currentMessage = ""
 			m.messages = append(m.messages, &ai.Message{
 				Role:    "model",
 				Content: []*ai.Part{{Text: msg.resp}},
@@ -302,17 +327,7 @@ func main() {
 		Level: slog.LevelWarn,
 	})))
 
-	err := db.Connect()
-	if err != nil {
-		panic(err)
-	}
-
-	g, err := gen.InitGenkit()
-	if err != nil {
-		panic(err)
-	}
-
-	p := tea.NewProgram(initialModel(g))
+	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)

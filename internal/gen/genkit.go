@@ -12,9 +12,11 @@ import (
 
 var Tools []ai.ToolRef
 
-func InitGenkit() (*genkit.Genkit, error) {
+func InitGenkit(apiKey string) (*genkit.Genkit, error) {
 	g := genkit.Init(context.Background(),
-		genkit.WithPlugins(&googlegenai.GoogleAI{}),
+		genkit.WithPlugins(&googlegenai.GoogleAI{
+			APIKey: apiKey,
+		}),
 	)
 
 	Tools = []ai.ToolRef{
