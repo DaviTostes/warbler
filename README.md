@@ -1,34 +1,41 @@
 # boteco
 
-CLI chat assistant in Go. Powered by [Genkit](https://github.com/firebase/genkit) + OpenAI (`gpt-5-nano`). Streams replies in the terminal and can call tools.
+CLI chat assistant in Go. Uses Genkit + Gemini to stream replies in the
+terminal. Has tool support so it can actually do useful things instead of
+just making stuff up.
 
-## Tools
+## tools
 
-- `web_search` — DuckDuckGo HTML scrape for time-sensitive queries.
-- `create_event` — insert event (description, date) into local SQLite.
-- `fetch_events` — list stored events.
+Pretty simple. You ask it something, it can call these:
 
-## Stack
+- **Web Search** — scrapes DuckDuckGo. For when you need actual data.
+- **Events** — CRUD on a local SQLite calendar. "Remind me about X on Y" actually works.
+- **Memories** — persistent memory between sessions. It remembers what you tell it. Novel concept.
+
+## prerequisites
 
 - Go 1.26
-- `github.com/firebase/genkit/go`
-- `modernc.org/sqlite` (pure-Go SQLite)
+- A Gemini API key (Google AI Studio)
 
-## Setup
+## setup
 
-```sh
-cp .env.example .env
-# edit .env:
-#   OPENAI_API_KEY=...
-#   DB_PATH=./boteco.db
+Put this in `~/.config/boteco/config.json`:
+
+```json
+{ "gemini": { "api_key": "AIza...", "model": "googleai/gemini-3.5-flash" } }
 ```
 
-## Run
+## run
 
 ```sh
-task dev
-# or
-go run main.go
+go run cmd/tui/main.go
 ```
 
-Type at the `>` prompt. `Ctrl+C` or EOF to exit.
+`Ctrl+C` twice or `Esc` to exit.
+
+---
+
+## why
+
+I wanted a CLI assistant that actually works, doesn't require a browser, and
+can call tools. Also, no Electron.
