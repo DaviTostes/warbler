@@ -22,6 +22,7 @@ func InitGenkit(apiKey string) (*genkit.Genkit, error) {
 	Tools = []ai.ToolRef{
 		tools.WebSearchTool(g),
 		tools.CreateEventTool(g),
+		tools.DeleteEventTool(g),
 		tools.FetchEvents(g),
 	}
 

@@ -40,6 +40,24 @@ func CreateEventTool(g *genkit.Genkit) *ai.ToolDef[Event, string] {
 	)
 }
 
+type DeleteEvent struct {
+	ID uint `json:"id"`
+}
+
+func DeleteEventTool(g *genkit.Genkit) *ai.ToolDef[DeleteEvent, string] {
+	return genkit.DefineTool(g, "delete_event",
+		"Delete an event",
+		func(ctx *ai.ToolContext, input DeleteEvent) (string, error) {
+			_, err := db.DB.Exec("DELETE FROM events WHERE id = ?", input.ID)
+			if err != nil {
+				return "", err
+			}
+
+			return "Event created", nil
+		},
+	)
+}
+
 type FetchEventsInput struct{}
 
 func FetchEvents(g *genkit.Genkit) *ai.ToolDef[FetchEventsInput, string] {
