@@ -1,7 +1,6 @@
 package main
 
 import (
-	"boteco/internal/config"
 	"boteco/internal/db"
 	"boteco/internal/gen"
 	"fmt"
@@ -42,7 +41,14 @@ func waitChunk(m model) tea.Cmd {
 
 func startGeneration(m model, prompt string) tea.Cmd {
 	go func() {
-		stream := gen.GenerateStream(m.g, gen.BuildSystemPrompt(time.Now()), prompt, gen.Tools, m.messages)
+		var filteredMessages []*ai.Message
+		for _, m := range m.messages {
+			if m.Role != "assistant" {
+				filteredMessages = append(filteredMessages, m)
+			}
+		}
+
+		stream := gen.GenerateStream(m.g, gen.BuildSystemPrompt(time.Now()), prompt, gen.Tools, filteredMessages)
 		for result, err := range stream {
 			if err != nil {
 				m.streamCh <- generatedMsg{resp: "", err: err}
@@ -129,20 +135,15 @@ func (m model) renderLive() string {
 		Render(b.String())
 }
 
-func initialModel() model {
+func NewModel() model {
 	err := db.Connect()
-	if err != nil {
-		panic(err)
-	}
-
-	c, err := config.GetConfig()
 	if err != nil {
 		panic(err)
 	}
 
 	gen.BuildSystemPrompt(time.Now())
 
-	g, err := gen.InitGenkit(c.Gemini.ApiKey)
+	g, err := gen.InitGenkit()
 	if err != nil {
 		panic(err)
 	}
@@ -152,7 +153,6 @@ func initialModel() model {
 	ta.SetVirtualCursor(false)
 	ta.Focus()
 
-	ta.Prompt = "| "
 	ta.CharLimit = 10000
 
 	ta.SetWidth(30)
@@ -336,7 +336,7 @@ func main() {
 		Level: slog.LevelWarn,
 	})))
 
-	p := tea.NewProgram(initialModel())
+	p := tea.NewProgram(NewModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)

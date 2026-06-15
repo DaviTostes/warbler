@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	Gemini struct {
+	Default string `json:"default"` // gemini
+	Gemini  struct {
 		ApiKey string `json:"api_key"`
 		Model  string `json:"model"`
 	} `json:"gemini"`

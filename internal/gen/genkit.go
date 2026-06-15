@@ -1,8 +1,10 @@
 package gen
 
 import (
+	"boteco/internal/config"
 	"boteco/internal/gen/tools"
 	"context"
+	"fmt"
 	"iter"
 
 	"github.com/firebase/genkit/go/ai"
@@ -11,13 +13,30 @@ import (
 )
 
 var Tools []ai.ToolRef
+var model string
 
-func InitGenkit(apiKey string) (*genkit.Genkit, error) {
-	g := genkit.Init(context.Background(),
-		genkit.WithPlugins(&googlegenai.GoogleAI{
-			APIKey: apiKey,
-		}),
-	)
+var validProviders = map[string]func(config.Config) (*genkit.Genkit, string){
+	"gemini": func(c config.Config) (*genkit.Genkit, string) {
+		return genkit.Init(context.Background(),
+			genkit.WithPlugins(&googlegenai.GoogleAI{
+				APIKey: c.Gemini.ApiKey,
+			})), c.Gemini.Model
+	},
+}
+
+func InitGenkit() (*genkit.Genkit, error) {
+	c, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	fn, ok := validProviders[c.Default]
+	if !ok {
+		return nil, fmt.Errorf("Invalid provider")
+	}
+
+	var g *genkit.Genkit
+	g, model = fn(c)
 
 	Tools = []ai.ToolRef{
 		tools.WebSearchTool(g),
@@ -37,7 +56,7 @@ func InitGenkit(apiKey string) (*genkit.Genkit, error) {
 func Generate(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef, messages []*ai.Message) (string, error) {
 	resp, err := genkit.Generate(
 		context.Background(), g,
-		ai.WithModelName("googleai/gemini-3.1-pro-preview"),
+		ai.WithModelName(model),
 		ai.WithSystem(system),
 		ai.WithPrompt(prompt),
 		ai.WithTools(tools...),
@@ -51,12 +70,12 @@ func Generate(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef, messa
 func GenerateStream(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef, messages []*ai.Message) iter.Seq2[*ai.ModelStreamValue, error] {
 	resp := genkit.GenerateStream(
 		context.Background(), g,
-		ai.WithModelName("googleai/gemini-3.5-flash"),
+		ai.WithModelName(model),
 		ai.WithSystem(system),
 		ai.WithPrompt(prompt),
 		ai.WithTools(tools...),
-		ai.WithMaxTurns(25),
 		ai.WithMessages(messages...),
+		ai.WithMaxTurns(25),
 	)
 
 	return resp
