@@ -24,12 +24,15 @@ import (
 )
 
 type item struct {
+	id          uint
 	title, desc string
 }
 
 func (i item) Title() string       { return i.title }
 func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.desc }
+
+var docStyle = lipgloss.NewStyle().Margin(1, 1)
 
 type generatedMsg struct {
 	resp string
@@ -143,7 +146,34 @@ type model struct {
 	streamCh       chan generatedMsg
 	generating     bool
 	doubleCtrlC    bool
+	width          int
+	height         int
 	err            error
+}
+
+func (m model) openChat(id uint, title string) (tea.Model, tea.Cmd) {
+	msgs, err := chat.GetMessagesFromChat(id)
+	if err != nil {
+		m.err = err
+		return m, nil
+	}
+
+	m.messages = m.messages[:0]
+	for _, msg := range msgs {
+		m.messages = append(m.messages, &ai.Message{
+			Role:    ai.Role(msg.Role),
+			Content: []*ai.Part{{Text: msg.Text}},
+		})
+	}
+
+	m.chatID = id
+	m.chatTitle = title
+	m.mode = "chat"
+
+	m.viewport.SetContent(m.renderMessages())
+	m.viewport.GotoBottom()
+
+	return m, nil
 }
 
 func (m model) renderMessages() string {
@@ -186,19 +216,6 @@ func NewModel() model {
 		panic(err)
 	}
 
-	chats, err := chat.GetChats()
-	if err != nil {
-		panic(err)
-	}
-
-	var listItems []list.Item
-	for _, c := range chats {
-		listItems = append(listItems, item{
-			title: c.Title,
-			desc:  c.CreatedAt.String(),
-		})
-	}
-
 	gen.BuildSystemPrompt(time.Now())
 
 	g, err := gen.InitGenkit()
@@ -211,7 +228,7 @@ func NewModel() model {
 	ta.SetVirtualCursor(false)
 	ta.Focus()
 
-	ta.CharLimit = 50000
+	ta.CharLimit = 10000
 
 	ta.SetWidth(30)
 	ta.SetHeight(3)
@@ -237,7 +254,6 @@ func NewModel() model {
 		textarea:       ta,
 		viewport:       vp,
 		spinner:        sp,
-		list:           list.New(listItems, list.NewDefaultDelegate(), 0, 0),
 		mode:           "chat",
 		spinning:       false,
 		g:              g,
@@ -259,21 +275,30 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		headerStyle := lipgloss.NewStyle().
-			Bold(true).
-			Padding(1, 1)
+		m.width = msg.Width
+		m.height = msg.Height
+		switch m.mode {
+		case "list":
+			h, v := docStyle.GetFrameSize()
+			m.list.SetSize(msg.Width-h, msg.Height-v)
 
-		header := headerStyle.Render(m.chatTitle)
+		default:
+			headerStyle := lipgloss.NewStyle().
+				Bold(true).
+				Padding(1, 1)
 
-		headerHeight := lipgloss.Height(header)
+			header := headerStyle.Render(m.chatTitle)
 
-		m.viewport.SetWidth(msg.Width)
-		m.textarea.SetWidth(msg.Width)
-		m.viewport.SetHeight(msg.Height - headerHeight - m.textarea.Height())
+			headerHeight := lipgloss.Height(header)
 
-		if len(m.messages) > 0 {
-			m.viewport.SetContent(m.renderMessages())
-			m.viewport.GotoBottom()
+			m.viewport.SetWidth(msg.Width)
+			m.textarea.SetWidth(msg.Width)
+			m.viewport.SetHeight(msg.Height - headerHeight - m.textarea.Height())
+
+			if len(m.messages) > 0 {
+				m.viewport.SetContent(m.renderMessages())
+				m.viewport.GotoBottom()
+			}
 		}
 		return m, nil
 
@@ -294,7 +319,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.doubleCtrlC = true
 
 		case "ctrl+l":
-			m.mode = "list"
+			if m.mode == "chat" {
+				m.mode = "list"
+
+				chats, err := chat.GetChats()
+				if err != nil {
+					panic(err)
+				}
+
+				var listItems []list.Item
+				for _, c := range chats {
+					listItems = append(listItems, item{
+						id:    c.ID,
+						title: c.Title,
+						desc:  c.CreatedAt.String(),
+					})
+				}
+
+				h, v := docStyle.GetFrameSize()
+				m.list = list.New(listItems, list.NewDefaultDelegate(), m.width-h, m.height-v)
+				m.list.Title = "Chat History"
+			}
 
 		case "pgup", "pgdown", "ctrl+u", "ctrl+d":
 			var cmd tea.Cmd
@@ -302,6 +347,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 
 		case "enter":
+			if m.mode == "list" {
+				// while filtering, let the list consume enter to apply the filter
+				if m.list.FilterState() == list.Filtering {
+					break
+				}
+				if it, ok := m.list.SelectedItem().(item); ok {
+					return m.openChat(it.id, it.title)
+				}
+				return m, nil
+			}
+
 			if m.generating {
 				return m, nil
 			}
@@ -444,32 +500,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.list, cmd = m.list.Update(msg)
 		return m, cmd
-
 	default:
-		var cmd tea.Cmd
-		m.textarea, cmd = m.textarea.Update(msg)
-		return m, cmd
+		var textareaCmd tea.Cmd
+		m.textarea, textareaCmd = m.textarea.Update(msg)
+		return m, textareaCmd
 	}
 }
 
 func (m model) View() tea.View {
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Padding(1, 1)
-	header := headerStyle.Render(m.chatTitle + "\n" + m.mode)
+	var v tea.View
 
-	body := lipgloss.JoinVertical(
-		lipgloss.Left,
-		header,
-		m.viewport.View(),
-		m.textarea.View(),
-	)
+	switch m.mode {
+	case "list":
+		v = tea.NewView(docStyle.Render(m.list.View()))
 
-	v := tea.NewView(body)
+	default:
+		headerStyle := lipgloss.NewStyle().
+			Bold(true).
+			Padding(1, 1)
+		header := headerStyle.Render(m.chatTitle)
 
-	if c := m.textarea.Cursor(); c != nil {
-		c.Y += lipgloss.Height(header) + lipgloss.Height(m.viewport.View())
-		v.Cursor = c
+		body := lipgloss.JoinVertical(
+			lipgloss.Left,
+			header,
+			m.viewport.View(),
+			m.textarea.View(),
+		)
+
+		v = tea.NewView(body)
+
+		if c := m.textarea.Cursor(); c != nil {
+			c.Y += lipgloss.Height(header) + lipgloss.Height(m.viewport.View())
+			v.Cursor = c
+		}
 	}
 
 	return v

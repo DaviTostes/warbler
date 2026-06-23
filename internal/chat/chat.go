@@ -24,7 +24,7 @@ type Chat struct {
 }
 
 func GetChats() ([]Chat, error) {
-	rows, err := db.DB.Query("SELECT * FROM chats")
+	rows, err := db.DB.Query("SELECT * FROM chats ORDER BY id DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ type Message struct {
 }
 
 func GetMessagesFromChat(chatID uint) ([]Message, error) {
-	rows, err := db.DB.Query("SELECT * FROM chat_messages WHERE chat_id = ?", chatID)
+	rows, err := db.DB.Query("SELECT id, text, role, created_at FROM chat_messages WHERE chat_id = ? ORDER BY id", chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func GetMessagesFromChat(chatID uint) ([]Message, error) {
 	messages := []Message{}
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.Text, &m.Role, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.Text, &m.Role, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, m)
