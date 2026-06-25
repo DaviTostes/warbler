@@ -1,8 +1,8 @@
 # warbler
 
-CLI chat assistant in Go. Uses Genkit + Gemini to stream replies in the
-terminal. Has tool support so it can actually do useful things instead of
-just making stuff up.
+Terminal chat assistant in Go. Streams replies right in the terminal. 
+Has tool support so it can actually do useful things instead of just making stuff up. 
+Conversations are saved to a local SQLite database, so you can reopen past chats.
 
 ## tools
 
@@ -22,16 +22,31 @@ Pretty simple. You ask it something, it can call these:
 Put this in `~/.config/warbler/config.json`:
 
 ```json
-{ "gemini": { "api_key": "AIza...", "model": "googleai/gemini-3.5-flash" } }
+{
+  "default": "gemini",
+  "gemini": { "api_key": "AIza...", "model": "googleai/gemini-3.5-flash" }
+}
 ```
 
-## run
+## build & use
+
+Run straight from source:
 
 ```sh
-go run cmd/tui/main.go
+go run ./cmd/tui
 ```
 
-`Ctrl+C` twice or `Esc` to exit.
+Or build a binary and put it on your `PATH`:
+
+```sh
+go build -o warbler ./cmd/tui
+./warbler
+```
+
+## commands
+
+- `Ctrl+L` lists saved chats, 
+- `Ctrl+C` twice or `Esc` to exit.
 
 ---
 
