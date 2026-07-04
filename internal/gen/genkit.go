@@ -1,11 +1,11 @@
 package gen
 
 import (
-	"warbler/internal/config"
-	"warbler/internal/gen/tools"
 	"context"
 	"fmt"
 	"iter"
+	"warbler/internal/config"
+	"warbler/internal/gen/tools"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -40,6 +40,7 @@ func InitGenkit() (*genkit.Genkit, error) {
 
 	Tools = []ai.ToolRef{
 		tools.WebSearchTool(g),
+		tools.WikiSearchTool(g),
 
 		tools.CreateEventTool(g),
 		tools.DeleteEventTool(g),
