@@ -12,8 +12,14 @@ import (
 )
 
 type WikipediaResponse struct {
-	BatchComplete string `json:"batchcomplete"`
-	Query         Query  `json:"query"`
+	BatchComplete bool `json:"batchcomplete"`
+	Query         struct {
+		Pages []struct {
+			PageID  int    `json:"pageid"`
+			Title   string `json:"title"`
+			Extract string `json:"extract"` // The clean plain-text summary lives here
+		} `json:"pages"`
+	} `json:"query"`
 }
 
 type Query struct {
@@ -34,17 +40,23 @@ type Revision struct {
 }
 
 func wikiSearch(ctx context.Context, titles string) (WikipediaResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://pt.wikipedia.org/w/api.php", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://en.wikipedia.org/w/api.php", nil)
 	if err != nil {
 		return WikipediaResponse{}, err
 	}
 
+	req.Header.Add("User-Agent", "Warbler/1.0 (davisiqueira591@gmail.com)")
+
 	query := req.URL.Query()
 	query.Add("action", "query")
-	query.Add("prop", "revisions")
-	query.Add("rvprop", "content")
+	query.Add("prop", "extracts")
+	query.Add("exintro", "1")
+	query.Add("explaintext", "1")
 	query.Add("format", "json")
+	query.Add("formatversion", "2")
 	query.Add("titles", titles)
+
+	req.URL.RawQuery = query.Encode()
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -57,6 +69,8 @@ func wikiSearch(ctx context.Context, titles string) (WikipediaResponse, error) {
 
 	body, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
+
+	// fmt.Println(string(body))
 
 	var structBody WikipediaResponse
 	err = json.Unmarshal(body, &structBody)

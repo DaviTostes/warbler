@@ -209,6 +209,7 @@ func (m model) renderLive() string {
 	b.WriteString(roleStyle.Render("| model"))
 	b.WriteString("\n")
 	b.WriteString(t)
+	b.WriteString("\n")
 
 	return lipgloss.NewStyle().
 		Width(m.viewport.Width()).
