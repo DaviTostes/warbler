@@ -10,6 +10,7 @@ import (
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
+	"github.com/firebase/genkit/go/plugins/ollama"
 )
 
 var Tools []ai.ToolRef
@@ -21,6 +22,13 @@ var validProviders = map[string]func(config.Config) (*genkit.Genkit, string){
 			genkit.WithPlugins(&googlegenai.GoogleAI{
 				APIKey: c.Gemini.ApiKey,
 			})), c.Gemini.Model
+	},
+
+	"ollama": func(c config.Config) (*genkit.Genkit, string) {
+		return genkit.Init(context.Background(),
+			genkit.WithPlugins(&ollama.Ollama{
+				ServerAddress: c.Ollama.ServerAddress,
+			})), c.Ollama.Model
 	},
 }
 
@@ -63,6 +71,9 @@ func Generate(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef, messa
 		ai.WithTools(tools...),
 		ai.WithMaxTurns(25),
 		ai.WithMessages(messages...),
+		ai.WithConfig(&ollama.GenerateContentConfig{
+			Think: ollama.ThinkEnabled(false),
+		}),
 	)
 
 	return resp.Text(), err
@@ -77,6 +88,9 @@ func GenerateStream(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef,
 		ai.WithTools(tools...),
 		ai.WithMaxTurns(25),
 		ai.WithMessages(messages...),
+		ai.WithConfig(&ollama.GenerateContentConfig{
+			Think: ollama.ThinkEnabled(false),
+		}),
 	)
 
 	return resp

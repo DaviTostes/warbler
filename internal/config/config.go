@@ -7,11 +7,15 @@ import (
 )
 
 type Config struct {
-	Default string `json:"default"` // gemini
+	Default string `json:"default"` // gemini, ollama
 	Gemini  struct {
 		ApiKey string `json:"api_key"`
 		Model  string `json:"model"`
 	} `json:"gemini"`
+	Ollama struct {
+		ServerAddress string `json:"server_address"`
+		Model         string `json:"model"`
+	} `json:"ollama"`
 }
 
 func getConfigPath() (string, error) {
