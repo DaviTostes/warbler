@@ -57,6 +57,7 @@ func InitGenkit() (*genkit.Genkit, error) {
 
 	Tools = []ai.ToolRef{
 		tools.WebSearchTool(g),
+		tools.UrlFetchTool(g),
 		tools.WikiSearchTool(g),
 
 		tools.CreateEventTool(g),
@@ -78,7 +79,7 @@ func Generate(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef, messa
 		ai.WithSystem(system),
 		ai.WithPrompt(prompt),
 		ai.WithTools(tools...),
-		ai.WithMaxTurns(25),
+		ai.WithMaxTurns(10),
 		ai.WithMessages(messages...),
 		additionalConfig,
 	)
@@ -93,7 +94,7 @@ func GenerateStream(g *genkit.Genkit, system, prompt string, tools []ai.ToolRef,
 		ai.WithSystem(system),
 		ai.WithPrompt(prompt),
 		ai.WithTools(tools...),
-		ai.WithMaxTurns(25),
+		ai.WithMaxTurns(10),
 		ai.WithMessages(messages...),
 		additionalConfig,
 	)
