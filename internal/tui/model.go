@@ -7,6 +7,7 @@ import (
 	"warbler/internal/chat"
 	"warbler/internal/db"
 	"warbler/internal/gen"
+	"warbler/internal/notify"
 
 	"charm.land/bubbles/v2/cursor"
 	"charm.land/bubbles/v2/list"
@@ -241,8 +242,8 @@ func NewModel() model {
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
 	sp := spinner.New()
-	sp.Spinner = spinner.Moon
-	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	sp.Spinner = spinner.Ellipsis
+	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
 
 	return model{
 		textarea:       ta,
@@ -454,6 +455,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.spinning = false
 			m.generating = false
 			m.currentMessage = ""
+
+			notify.Notify("piu piu")
 
 			m.viewport.SetContent(m.renderMessages())
 			m.viewport.GotoBottom()
