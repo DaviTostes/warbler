@@ -456,8 +456,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.generating = false
 			m.currentMessage = ""
 
-			notify.Notify("piu piu")
-
 			m.viewport.SetContent(m.renderMessages())
 			m.viewport.GotoBottom()
 			return m, nil
