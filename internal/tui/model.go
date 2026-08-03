@@ -7,7 +7,6 @@ import (
 	"warbler/internal/chat"
 	"warbler/internal/db"
 	"warbler/internal/gen"
-	"warbler/internal/notify"
 
 	"charm.land/bubbles/v2/cursor"
 	"charm.land/bubbles/v2/list"
