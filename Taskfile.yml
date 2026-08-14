@@ -8,7 +8,7 @@ tasks:
       - go run cmd/tui/main.go
   test:
     cmds:
-      - go run cmd/test/main.go
+      - go run cmd/tests/main.go
   make:
     cmds:
       - go build -o warbler ./cmd/tui/main.go && mv warbler ~/.local/bin/

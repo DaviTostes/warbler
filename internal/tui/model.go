@@ -76,7 +76,10 @@ func startGeneration(m model, prompt string) tea.Cmd {
 				return
 			}
 
-			m.streamCh <- generatedMsg{resp: result.Chunk.Text(), err: nil}
+			chunk := result.Chunk.Text()
+			if !strings.Contains(result.Chunk.Reasoning(), chunk) {
+				m.streamCh <- generatedMsg{resp: chunk, err: nil}
+			}
 		}
 	}()
 

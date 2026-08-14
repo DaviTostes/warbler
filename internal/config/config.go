@@ -15,6 +15,7 @@ type Config struct {
 	Ollama struct {
 		ServerAddress string `json:"server_address"`
 		Model         string `json:"model"`
+		Thinking      bool   `json:"thinking"`
 	} `json:"ollama"`
 }
 

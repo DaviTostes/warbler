@@ -30,7 +30,7 @@ var validProviders = map[string]func(config.Config) (*genkit.Genkit, string){
 	"ollama": func(c config.Config) (*genkit.Genkit, string) {
 		additionalConfig = ai.WithConfig(
 			&ollama.GenerateContentConfig{
-				Think: ollama.ThinkEnabled(false),
+				Think: ollama.ThinkEnabled(c.Ollama.Thinking),
 			},
 		)
 
