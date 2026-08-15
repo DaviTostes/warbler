@@ -366,10 +366,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.spinner.Tick,
 			}
 
-			if len(m.messages) == 0 {
-				msgs = append(msgs, createChat(m, prompt))
-			}
-
 			aiMsg := &ai.Message{
 				Role: "user",
 				Content: []*ai.Part{
@@ -460,7 +456,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.viewport.SetContent(m.renderMessages())
 			m.viewport.GotoBottom()
-			return m, nil
+
+			var cmd tea.Cmd
+			if m.chatID == 0 {
+				cmd = createChat(m, m.messages[0].Text())
+			}
+
+			return m, cmd
 		}
 
 		m.currentMessage += msg.resp
